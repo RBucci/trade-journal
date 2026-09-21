@@ -177,22 +177,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ))}
     </nav>
   );
-  const footer = (
-    <div className="journal-sidebar-footer space-y-1 border-t p-3 text-xs text-muted-foreground">
-      <div>
-        Open source ·{" "}
-        <a
-          href="https://github.com/LuxAlgo/trade-journal"
-          className="underline underline-offset-2 hover:text-foreground"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub
-        </a>
-      </div>
-      <div>Not investment advice.</div>
-    </div>
-  );
+  const footer = null;
   return (
     <div className="journal-shell min-h-dvh lg:flex">
       <header className="journal-mobile-header sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur lg:hidden">
