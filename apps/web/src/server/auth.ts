@@ -36,6 +36,6 @@ export const verifySession = (token: string | undefined): boolean => {
  */
 export const isSecureRequest = (request: Request): boolean => {
   const forwarded = request.headers.get("x-forwarded-proto");
-  if (forwarded) return forwarded.split(",")[0].trim().toLowerCase() === "https";
+  if (forwarded) return forwarded.split(",")[0]?.trim().toLowerCase() === "https";
   return new URL(request.url).protocol === "https:";
 };
