@@ -86,6 +86,9 @@ importers:
       ai:
         specifier: ^7.0.77
         version: 7.0.77(zod@4.4.3)
+      better-sqlite3:
+        specifier: ^12.11.1
+        version: 12.11.1
       better-sqlite3-multiple-ciphers:
         specifier: 13.0.3
         version: 13.0.3
@@ -147,9 +150,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.1.0
         version: 19.2.5(@types/react@19.2.18)
-      better-sqlite3:
-        specifier: ^12.11.1
-        version: 12.11.1
       postcss:
         specifier: ^8.5.26
         version: 8.5.26
