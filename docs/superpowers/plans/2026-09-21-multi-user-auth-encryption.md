@@ -217,7 +217,7 @@ describe("key material", () => {
     const key = generateRecoveryKey();
     expect(key).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
     expect(normalizeRecoveryKey(key.toLowerCase())).toBe(key.replace(/-/g, ""));
-    expect(normalizeRecoveryKey("oil0-1")).toBe("011001");
+    expect(normalizeRecoveryKey("oil0-1")).toBe("01101");
   });
   it("password hash verifies and rejects", () => {
     const salt = generateSalt();
@@ -751,7 +751,7 @@ export const findUserByUsername = (username: string): UserRecord | null => {
   return row ? toRecord(row) : null;
 };
 export const listUsers = (): UserRecord[] =>
-  (authDb().prepare("SELECT * FROM users ORDER BY created_at").all() as UserRow[]).map(toRecord);
+  (authDb().prepare("SELECT * FROM users ORDER BY created_at, rowid").all() as UserRow[]).map(toRecord);
 
 export const setUserLock = (userId: string, lockedUntil: string | null): void => {
   authDb()
@@ -1334,10 +1334,10 @@ const min = (n: number) => n * 60 * 1000;
 
 describe("rate limiting", () => {
   it("blocks an IP for 60 minutes after 10 attempts in 5 minutes, success included", () => {
-    for (let i = 0; i < 9; i += 1) rl.recordAttempt("203.0.113.9", "alice", i === 0, T0 + i * 1000);
-    expect(rl.checkLogin("203.0.113.9", "alice", T0 + 10000).allowed).toBe(true);
-    rl.recordAttempt("203.0.113.9", "alice", false, T0 + 10000);
-    const denied = rl.checkLogin("203.0.113.9", "alice", T0 + 11000);
+    for (let i = 0; i < 9; i += 1) rl.recordAttempt("203.0.113.9", "ghost", i === 0, T0 + i * 1000);
+    expect(rl.checkLogin("203.0.113.9", "ghost", T0 + 10000).allowed).toBe(true);
+    rl.recordAttempt("203.0.113.9", "ghost", false, T0 + 10000);
+    const denied = rl.checkLogin("203.0.113.9", "ghost", T0 + 11000);
     expect(denied.allowed).toBe(false);
     if (!denied.allowed) {
       expect(denied.retryAfterSec).toBeGreaterThan(min(59) / 1000);
@@ -1684,12 +1684,14 @@ Expected: FAIL (old `handler` imports removed names from `server/auth`).
 
 - [ ] **Step 3: Rewrite `handler` in `server/api.ts`**
 
-Replace the imports and the `handler` export; keep `RequestError`, `requireValue`, `ok`, `bad` as they are.
+Replace the imports and the `handler` export; keep `ok` and `bad` as they are and keep the `./errors` re-export added in Task 3.
 
 ```ts
 // apps/web/src/server/api.ts  (top of file)
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { RequestError } from "./errors";
+export { RequestError, requireValue } from "./errors";
 import { AUTH_COOKIE } from "./auth";
 import { authDbExists } from "@/db/paths";
 import { JournalOpenError } from "@/db/journal";
@@ -3470,14 +3472,14 @@ if (!globalForSweep.__journalSessionSweep && process.env.VITEST !== "true") {
   globalForSweep.__journalSessionSweep = true;
   queueMicrotask(() => {
     try {
-      if (require("@/db/paths").authDbExists()) sweepExpiredSessions();
+      if (authDbExists()) sweepExpiredSessions();
     } catch {
       /* auth.db not writable yet; handler() reports it on first request */
     }
   });
 }
 ```
-Use `import { authDbExists } from "@/db/paths";` at the top instead of `require` if the bundler rejects `require`.
+Add `import { authDbExists } from "@/db/paths";` at the top of `sessions.ts`.
 
 - [ ] **Step 2: Installer**
 
