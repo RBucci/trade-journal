@@ -1,5 +1,11 @@
 import { cookies } from "next/headers";
-import { AUTH_COOKIE, passwordConfigured, sessionToken, verifyPassword } from "@/server/auth";
+import {
+  AUTH_COOKIE,
+  isSecureRequest,
+  passwordConfigured,
+  sessionToken,
+  verifyPassword,
+} from "@/server/auth";
 import { bad, handler, ok } from "@/server/api";
 
 export const POST = handler(
@@ -12,7 +18,7 @@ export const POST = handler(
     jar.set(AUTH_COOKIE, sessionToken(), {
       httpOnly: true,
       sameSite: "lax",
-      secure: new URL(request.url).protocol === "https:",
+      secure: isSecureRequest(request),
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });

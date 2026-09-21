@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { handler, ok } from "../src/server/api";
-import { sessionToken, verifyPassword } from "../src/server/auth";
+import { isSecureRequest, sessionToken, verifyPassword } from "../src/server/auth";
 
 const session = vi.hoisted(() => ({ token: undefined as string | undefined }));
 vi.mock("next/headers", () => ({
@@ -37,5 +37,32 @@ describe("optional journal password protection", () => {
     expect(verifyPassword("test-password")).toBe(true);
     expect(verifyPassword("wrong-password")).toBe(false);
     expect((await handler(() => ok({ login: true }), { public: true })()).status).toBe(200);
+  });
+});
+
+describe("secure cookie detection behind a reverse proxy", () => {
+  const req = (url: string, headers: Record<string, string> = {}) => new Request(url, { headers });
+  it("is secure for a direct https request", () => {
+    expect(isSecureRequest(req("https://journal.example/api/auth"))).toBe(true);
+  });
+  it("is not secure for plain http with no proxy headers", () => {
+    expect(isSecureRequest(req("http://localhost:3000/api/auth"))).toBe(false);
+  });
+  it("trusts X-Forwarded-Proto https from a TLS-terminating proxy", () => {
+    expect(
+      isSecureRequest(req("http://localhost:3000/api/auth", { "x-forwarded-proto": "https" })),
+    ).toBe(true);
+  });
+  it("uses the first hop when X-Forwarded-Proto lists several", () => {
+    expect(
+      isSecureRequest(
+        req("http://localhost:3000/api/auth", { "x-forwarded-proto": "https, http" }),
+      ),
+    ).toBe(true);
+    expect(
+      isSecureRequest(
+        req("http://localhost:3000/api/auth", { "x-forwarded-proto": "http, https" }),
+      ),
+    ).toBe(false);
   });
 });

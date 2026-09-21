@@ -27,3 +27,15 @@ export const verifySession = (token: string | undefined): boolean => {
   const given = Buffer.from(token, "utf8");
   return expected.length === given.length && timingSafeEqual(expected, given);
 };
+
+/**
+ * Whether the browser reached us over HTTPS. Behind a TLS-terminating reverse
+ * proxy (Nginx Proxy Manager, Caddy, Cloudflare) the app itself only sees plain
+ * HTTP, so trust the first hop of X-Forwarded-Proto before falling back to the
+ * request URL. Drives the Secure flag on the session cookie.
+ */
+export const isSecureRequest = (request: Request): boolean => {
+  const forwarded = request.headers.get("x-forwarded-proto");
+  if (forwarded) return forwarded.split(",")[0].trim().toLowerCase() === "https";
+  return new URL(request.url).protocol === "https:";
+};

@@ -2,7 +2,7 @@ services:
   journal:
     build: .
     ports:
-      - "3333:3000"
+      - "${JOURNAL_PORT:-3333}:3000"
     volumes:
       - ./data:/data
     environment:
