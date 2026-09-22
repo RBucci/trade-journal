@@ -39,7 +39,7 @@ pnpm dev
 # http://localhost:3000
 ```
 
-Requirements: **Node 22+** and **pnpm 11.0.8** (the version pinned in `package.json`). First run creates the SQLite database and applies additive schema upgrades automatically. No migration tool, no setup wizard, no account. With the commands above, local data lives in `apps/web/data/`.
+Requirements: **Node 22+** and **pnpm 11.0.8** (the version pinned in `package.json`). First run creates the SQLite database and applies additive schema upgrades automatically. No migration tool. The first visit opens a one-step setup page that creates the administrator account. With the commands above, local data lives in `apps/web/data/`.
 
 For smooth everyday use or UI reviews, stop the development server and run `pnpm preview`.
 This builds the app once, then serves the optimized production version at the same address,
