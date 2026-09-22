@@ -118,9 +118,12 @@ export const listUserSessions = (userId: string) =>
   }));
 
 export const sweepExpiredSessions = (now = Date.now()): number => {
-  const result = authDb()
-    .prepare("DELETE FROM sessions WHERE expires_at <= ?")
-    .run(new Date(now).toISOString());
+  const cutoff = new Date(now).toISOString();
+  const expired = authDb()
+    .prepare("SELECT token_hash FROM sessions WHERE expires_at <= ?")
+    .all(cutoff) as { token_hash: string }[];
+  for (const { token_hash: tokenHash } of expired) memory.delete(tokenHash);
+  const result = authDb().prepare("DELETE FROM sessions WHERE expires_at <= ?").run(cutoff);
   return result.changes;
 };
 

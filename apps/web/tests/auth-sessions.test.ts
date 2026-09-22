@@ -54,4 +54,28 @@ describe("sessions", () => {
     expect(s.sessionCookieOptions(proxied).secure).toBe(true);
     expect(s.sessionCookieOptions(plain).maxAge).toBe(30 * 24 * 60 * 60);
   });
+  it("sweeping expired sessions removes them from the database and memory", () => {
+    const token = s.createSession(base);
+    const later = Date.now() + s.SESSION_TTL_MS + 1000;
+    expect(s.sweepExpiredSessions(later)).toBeGreaterThanOrEqual(1);
+    expect(s.resolveSession(token).kind).toBe("none");
+    expect(s.listUserSessions(alice.user.id)).toHaveLength(0);
+  });
+  it("touchSession updates last_seen_at at most once per interval", () => {
+    const token = s.createSession(base);
+    const resolved = s.resolveSession(token);
+    if (resolved.kind !== "active") throw new Error("expected active session");
+    const hash = resolved.tokenHash;
+    const before = s.listUserSessions(alice.user.id).find((r) => r.tokenHash === hash)?.lastSeenAt;
+
+    const sixMinutesLater = Date.now() + 6 * 60 * 1000;
+    s.touchSession(hash, sixMinutesLater);
+    const after = s.listUserSessions(alice.user.id).find((r) => r.tokenHash === hash)?.lastSeenAt;
+    expect(after).not.toBe(before);
+
+    const oneMinuteMore = sixMinutesLater + 60 * 1000;
+    s.touchSession(hash, oneMinuteMore);
+    const after2 = s.listUserSessions(alice.user.id).find((r) => r.tokenHash === hash)?.lastSeenAt;
+    expect(after2).toBe(after);
+  });
 });
