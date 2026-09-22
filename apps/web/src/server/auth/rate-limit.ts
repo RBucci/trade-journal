@@ -151,12 +151,17 @@ export const checkLogin = (
 ): { allowed: true } | { allowed: false; retryAfterSec: number; message: string } => {
   const ipUntil = blockExpiry(ip, now);
   if (ipUntil !== null) {
-    const retry = ipUntil === Number.POSITIVE_INFINITY ? 3600 : Math.ceil((ipUntil - now) / 1000);
-    const minutes = ipUntil === Number.POSITIVE_INFINITY ? 60 : minutesLeft(ipUntil, now);
+    if (ipUntil === Number.POSITIVE_INFINITY) {
+      return {
+        allowed: false,
+        retryAfterSec: 3600,
+        message: "Access from this address is blocked.",
+      };
+    }
     return {
       allowed: false,
-      retryAfterSec: retry,
-      message: `Too many attempts. Try again in ${minutes} minutes.`,
+      retryAfterSec: Math.ceil((ipUntil - now) / 1000),
+      message: `Too many attempts. Try again in ${minutesLeft(ipUntil, now)} minutes.`,
     };
   }
   const user = findUserByUsername(username);
@@ -191,7 +196,7 @@ export const recordAttempt = (
       expiresAt: iso(now + LIMITS.ip.blockMs),
     });
     console.warn(
-      `[auth] IP ${ip} blocked for ${LIMITS.ip.blockMs / 60000} minutes after ${LIMITS.ip.attempts} attempts`,
+      `[auth] IP ${ip} blocked for ${LIMITS.ip.blockMs / 60000} minutes after ${LIMITS.ip.attempts} attempts (username ${username})`,
     );
   }
   if (

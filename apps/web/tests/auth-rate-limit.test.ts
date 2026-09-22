@@ -51,6 +51,16 @@ describe("rate limiting", () => {
     expect(rl.isIpBlocked("192.0.2.77")).toBe(false);
     expect(rl.ipInCidr("::ffff:192.0.2.1", "192.0.2.0/24")).toBe(true);
   });
+  it("reports a permanent manual block with a fixed message, not a fake retry time", () => {
+    rl.addBlock({ cidr: "198.18.0.5" });
+    const denied = rl.checkLogin("198.18.0.5", "ghost");
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) {
+      expect(denied.message).toBe("Access from this address is blocked.");
+      expect(denied.retryAfterSec).toBe(3600);
+    }
+    rl.removeBlock("198.18.0.5");
+  });
   it("derives the client IP from proxy headers when trusted", () => {
     const req = (headers: Record<string, string>) =>
       new Request("http://localhost:3000/", { headers });
