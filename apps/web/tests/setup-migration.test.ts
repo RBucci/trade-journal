@@ -1,5 +1,5 @@
 // apps/web/tests/setup-migration.test.ts
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -14,6 +14,15 @@ const { setupRequired, runSetup } = await import("../src/server/auth/setup");
 const { verifyLogin } = await import("../src/server/auth/users");
 
 describe("first-run setup and migration", () => {
+  it("rolls back cleanly when migration fails, leaving setup retryable", () => {
+    const legacyPath = join(scratch, "journal.db");
+    writeFileSync(legacyPath, Buffer.alloc(64, 1));
+    expect(() => runSetup({ username: "admin", password: "admin-password-1" })).toThrow();
+    expect(setupRequired()).toBe(true);
+    expect(existsSync(join(scratch, "users"))).toBe(false);
+    rmSync(legacyPath, { force: true });
+  });
+
   it("moves a plaintext journal into the admin's encrypted journal", () => {
     // Seed the legacy journal (no auth.db yet, so db resolves to data/journal.db).
     db.insert(accounts)

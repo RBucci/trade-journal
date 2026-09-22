@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { bad, handler, ok } from "@/server/api";
+import { setupRequired } from "@/server/auth/setup";
 import { recoverWithKey } from "@/server/auth/users";
 import { deleteUserSessions } from "@/server/auth/sessions";
 import { checkLogin, clientIp, recordAttempt } from "@/server/auth/rate-limit";
 
 export const POST = handler(
   async (request: Request) => {
+    if (setupRequired())
+      return NextResponse.json(
+        { error: "Setup required", reason: "setup_required" },
+        { status: 409 },
+      );
     const body = (await request.json()) as {
       username?: string;
       recoveryKey?: string;

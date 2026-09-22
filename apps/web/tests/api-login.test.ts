@@ -1,5 +1,5 @@
 // apps/web/tests/api-login.test.ts
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -25,6 +25,7 @@ vi.mock("next/headers", () => ({
 const setup = await import("../src/app/api/setup/route");
 const auth = await import("../src/app/api/auth/route");
 const recover = await import("../src/app/api/auth/recover/route");
+const { authDbPath } = await import("../src/db/paths");
 
 const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>
   new Request(`http://localhost:3000${url}`, {
@@ -36,6 +37,22 @@ const get = (url: string) => new Request(`http://localhost:3000${url}`);
 
 describe("setup and login routes", () => {
   let recoveryKey = "";
+  it("rejects auth and recovery requests before setup, without creating auth.db", async () => {
+    const recoverRes = await recover.POST(
+      post("/api/auth/recover", {
+        username: "admin",
+        recoveryKey: "AAAAA-AAAAA-AAAAA-AAAAA",
+        newPassword: "admin-password-1",
+      }),
+    );
+    expect(recoverRes.status).toBe(409);
+    expect(existsSync(authDbPath())).toBe(false);
+    const loginRes = await auth.POST(
+      post("/api/auth", { username: "admin", password: "admin-password-1" }),
+    );
+    expect(loginRes.status).toBe(409);
+    expect(existsSync(authDbPath())).toBe(false);
+  });
   it("reports setup mode, then completes setup once", async () => {
     expect(await (await auth.GET(get("/api/auth"))).json()).toMatchObject({
       setupRequired: true,

@@ -69,4 +69,11 @@ export const authDb = (): Database.Database => {
   return sqlite;
 };
 
+/** Closes the cached connection (if any) and clears the cache, so the next authDb() call reopens the file. */
+export const closeAuthDb = (): void => {
+  globalForAuth.__journalAuthDb?.close();
+  globalForAuth.__journalAuthDb = undefined;
+  globalForAuth.__journalAuthDbPath = undefined;
+};
+
 export const nowIso = (): string => new Date().toISOString();
