@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { JournalDefaultSettings } from "@/components/journal-default-settings";
 import { MarketDataSettings } from "@/components/market-data-settings";
 import { AiSettings } from "@/components/ai-settings";
+import { AccountSettings } from "@/components/account-settings";
+import { UserAdmin } from "@/components/user-admin";
 import { Download } from "lucide-react";
 import { FilterBar } from "@/components/filter-bar";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,7 @@ export default function SettingsPage() {
 
 function Settings() {
   const { data, refresh } = useApi<SettingsPayload>("/api/settings");
+  const { data: me } = useApi<{ user?: { id: string; role: "admin" | "user" } }>("/api/auth");
   const [timeZone, setTimeZone] = useState("");
   const [importTimeZone, setImportTimeZone] = useState("");
   const [multipliers, setMultipliers] = useState("");
@@ -148,6 +151,9 @@ function Settings() {
         </Card>
 
         <AiSettings />
+
+        <AccountSettings />
+        {me?.user?.role === "admin" && <UserAdmin currentUserId={me.user.id} />}
 
         <Card>
           <CardHeader>
