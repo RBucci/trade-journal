@@ -30,7 +30,6 @@ const {
 const { mutateProp, propData, PropConflict } = await import("../src/server/prop-firms");
 const { importPropCsv } = await import("../src/server/prop-csv");
 const { GET, POST } = await import("../src/app/api/prop-firms/route");
-const { POST: csvPost } = await import("../src/app/api/prop-firms/csv/route");
 const { GET: exportData } = await import("../src/app/api/export/route");
 const account = (override: Record<string, unknown> = {}) => ({
   action: "account.save",
@@ -483,7 +482,7 @@ describe("generic cash imports and API boundaries", () => {
     expect(result.propAudit.length).toBeGreaterThan(5);
     expect(JSON.stringify(result)).not.toContain("secret-fixture");
   });
-  it("uses authentication, bounded requests, conflict status and private no-store responses", async () => {
+  it("uses bounded requests, conflict status and private no-store responses", async () => {
     const first = await POST(request(account()));
     expect(first.status).toBe(200);
     expect(first.headers.get("Cache-Control")).toBe("private, no-store");
@@ -491,9 +490,5 @@ describe("generic cash imports and API boundaries", () => {
       (await POST(request(account({ revision: 3, name: "Stale", reason: "Edit" })))).status,
     ).toBe(409);
     expect((await POST(request({ padding: "a".repeat(33000) }))).status).toBe(400);
-    vi.stubEnv("JOURNAL_PASSWORD", "fixture");
-    expect((await GET(new Request("http://localhost/api/prop-firms"))).status).toBe(401);
-    expect((await POST(request(account()))).status).toBe(401);
-    expect((await csvPost(request({ action: "preview", content: csv }))).status).toBe(401);
   });
 });

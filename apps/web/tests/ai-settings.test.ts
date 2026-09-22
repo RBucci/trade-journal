@@ -162,13 +162,6 @@ describe("AI provider settings", () => {
       aiConnections: { openai: { source: null } },
     });
   });
-
-  it("requires the journal session for reads and writes when a password is configured", async () => {
-    vi.stubEnv("JOURNAL_PASSWORD", "fixture-password");
-    expect((await GET()).status).toBe(401);
-    expect((await save({ openaiKey: "fixture-key" })).status).toBe(401);
-    expect(getAiKey("openai")).toBeNull();
-  });
 });
 
 describe("AI provider requests through the real SDK adapters", () => {

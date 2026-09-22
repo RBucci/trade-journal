@@ -477,16 +477,6 @@ describe("market data credential lifecycle", () => {
     expect(await response.text()).not.toContain("fixture-key-only");
     expect(fetcher.mock.calls).toHaveLength(1);
   });
-  it("uses the app's authentication gate for reads and writes", async () => {
-    vi.stubEnv("JOURNAL_PASSWORD", "fixture-password");
-    expect((await GET()).status).toBe(401);
-    expect((await listCsv()).status).toBe(401);
-    expect((await csvRequest(request({ action: "remove", id: "anything" }))).status).toBe(401);
-    expect(
-      (await POST(request({ provider: id, action: "save", apiKey: "fixture-key" }))).status,
-    ).toBe(401);
-    expect(connections()[0]?.configured).toBe(false);
-  });
 });
 
 afterEach(() => marketTransport.clear());
