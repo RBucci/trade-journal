@@ -102,6 +102,7 @@ else
   umask 077
   cat > "$ENV_FILE" <<EOF
 # Trade Journal secrets. Keep this file: losing JOURNAL_SECRET makes saved broker and AI keys unreadable.
+# After editing, run: sudo systemctl restart ${SERVICE_NAME}
 JOURNAL_PORT=${JOURNAL_PORT}
 JOURNAL_SECRET=${JOURNAL_SECRET}
 JOURNAL_TRUST_PROXY=true

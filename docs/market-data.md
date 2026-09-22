@@ -75,8 +75,8 @@ tick replay, option contracts, and exchange-calendar coverage are future capabil
 Saved keys use the journal's AES-256-GCM credential storage. Browser status responses
 contain only configuration state. Requests go from the server to fixed provider origins
 using provider-specific authentication headers; redirects are rejected and provider error bodies are never relayed.
-The application's existing optional password gate also protects these endpoints.
-Set `JOURNAL_PASSWORD` when serving the journal beyond your trusted local environment.
+These endpoints are protected by the same per-user sign-in as the rest of the journal:
+a valid session for a signed-in account is required to reach them.
 Keys and candles are excluded from journal exports; candles are not persisted or shared
 through a global cache. Use provider data within the permissions of your own account.
 
