@@ -1,3 +1,4 @@
+import { accessSync, constants, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { currentUserContext, type UserContext } from "@/server/auth/context";
 import { authDbExists, dataDir, legacyJournalPath, userDataDir } from "./paths";
@@ -66,3 +67,26 @@ export const db: Journal = new Proxy({} as Journal, {
       : value;
   },
 });
+
+const globalForHousekeeping = globalThis as unknown as { __journalHousekeeping?: boolean };
+if (!globalForHousekeeping.__journalHousekeeping) {
+  globalForHousekeeping.__journalHousekeeping = true;
+  if (process.env.JOURNAL_PASSWORD)
+    console.warn(
+      "[auth] JOURNAL_PASSWORD is ignored: accounts are managed in Settings → Users. Remove it from .env.",
+    );
+  if (process.env.VITEST !== "true") {
+    try {
+      mkdirSync(join(dataDir(), "users"), { recursive: true });
+      accessSync(dataDir(), constants.W_OK);
+    } catch {
+      console.error(
+        `[journal] data directory ${dataDir()} is not writable by uid ${process.getuid?.() ?? "?"}. ` +
+          "Fix: docker compose exec -u root journal chown -R node:node /data && docker compose restart",
+      );
+      process.exit(1);
+    }
+    const timer = setInterval(() => closeIdleJournals(), 5 * 60 * 1000);
+    timer.unref();
+  }
+}

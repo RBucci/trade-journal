@@ -3,9 +3,9 @@
 # install_as_service.sh
 #
 # One-shot installer for Trade Journal on Ubuntu (Desktop or Server, 22.04+).
-# Installs Docker if missing, clones the repo, generates a password and
-# encryption secret, builds the image, and registers a systemd service so the
-# journal starts on boot.
+# Installs Docker if missing, clones the repo, generates an encryption
+# secret, builds the image, and registers a systemd service so the journal
+# starts on boot.
 #
 # Usage (from any directory, on the target machine):
 #
@@ -24,8 +24,8 @@
 #   REPO_URL          git repository to clone     (default: https://github.com/RBucci/trade-journal.git)
 #   REPO_BRANCH       branch to check out         (default: main)
 #   JOURNAL_PORT      host port to listen on      (default: 3333)
-#   JOURNAL_PASSWORD  login password              (default: generated)
 #   JOURNAL_SECRET    encryption secret           (default: generated)
+#   JOURNAL_TRUST_PROXY  read client IP from X-Forwarded-For (default: true)
 #
 set -euo pipefail
 
@@ -90,29 +90,21 @@ chown -R "$OWNER:$OWNER" "$INSTALL_DIR"
 # ---------- 4. data directory ----------
 # Docker would otherwise create ./data as root on first start, and the app
 # (running as uid 1000 inside the container) could not open its database.
-mkdir -p "$INSTALL_DIR/data"
-chown "$CONTAINER_UID:$CONTAINER_UID" "$INSTALL_DIR/data"
+mkdir -p "$INSTALL_DIR/data/users" && chown -R "$CONTAINER_UID:$CONTAINER_UID" "$INSTALL_DIR/data"
 
 # ---------- 5. credentials ----------
 ENV_FILE="$INSTALL_DIR/.env"
-GENERATED_PASSWORD=""
 if [[ -f "$ENV_FILE" ]]; then
   say "Keeping existing $ENV_FILE"
 else
   say "Generating credentials in $ENV_FILE"
-  if [[ -z "${JOURNAL_PASSWORD:-}" ]]; then
-    JOURNAL_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 20)"
-    GENERATED_PASSWORD="$JOURNAL_PASSWORD"
-  fi
   JOURNAL_SECRET="${JOURNAL_SECRET:-$(openssl rand -hex 32)}"
   umask 077
   cat > "$ENV_FILE" <<EOF
-# Trade Journal credentials. Keep this file: losing JOURNAL_SECRET makes saved
-# broker and AI keys unreadable. After editing, run:
-#   sudo systemctl restart ${SERVICE_NAME}
+# Trade Journal secrets. Keep this file: losing JOURNAL_SECRET makes saved broker and AI keys unreadable.
 JOURNAL_PORT=${JOURNAL_PORT}
-JOURNAL_PASSWORD=${JOURNAL_PASSWORD}
 JOURNAL_SECRET=${JOURNAL_SECRET}
+JOURNAL_TRUST_PROXY=true
 EOF
   umask 022
   chown "$OWNER:$OWNER" "$ENV_FILE"
@@ -178,13 +170,11 @@ cat <<EOF
    Service:  sudo systemctl {status|restart|stop} ${SERVICE_NAME}
    Logs:     cd ${INSTALL_DIR} && docker compose logs -f
 EOF
-if [[ -n "$GENERATED_PASSWORD" ]]; then
-  cat <<EOF
+cat <<EOF
 
-   Login password:  ${GENERATED_PASSWORD}
-   (also saved in ${ENV_FILE}; edit it and restart the service to change)
+ Open the URL above to create the administrator account. Save the
+ recovery key it shows; it is the only way back in if the password is lost.
 EOF
-fi
 cat <<EOF
 
  Before exposing this to the internet, put an HTTPS reverse proxy

@@ -222,3 +222,12 @@ Unchanged. They run through the request-scoped `db` and therefore act on the cal
 ### Backup note for the runbook
 
 A backup now needs `data/` (all users' encrypted journals and `auth.db`) plus `.env`. Restoring a backup restores every user's journal; each user still needs their own password or recovery key to open theirs.
+
+## Addendum (planning)
+
+- Database access with no user context resolves to the legacy plaintext `data/journal.db` only while `auth.db` does not exist (tests, first-run migration). Once `auth.db` exists it throws.
+- `handler()` passes requests through without a session only when `auth.db` is absent and `process.env.VITEST === "true"`; in production it answers 409 `setup_required`.
+- The client IP trust switch is `JOURNAL_TRUST_PROXY` (boolean).
+- Locking a user from Settings also ends their sessions.
+- A second `POST /api/setup` answers 400 (RequestError), not 409.
+- Manual IP blocks are enforced in `handler()` for every API call. The edge middleware cannot read `auth.db`, so a blocked client can still load the HTML shell; every data request it makes answers 403.

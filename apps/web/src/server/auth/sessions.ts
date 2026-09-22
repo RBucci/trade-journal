@@ -1,6 +1,7 @@
 // apps/web/src/server/auth/sessions.ts
 import { createHash, randomBytes } from "node:crypto";
 import { isSecureRequest } from "@/server/auth";
+import { authDbExists } from "@/db/paths";
 import { authDb, nowIso, type Role } from "./db";
 
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -139,3 +140,15 @@ export const sessionCookieOptions = (request: Request) => ({
 export const forgetMemory = (): void => memory.clear();
 
 export { nowIso };
+
+const globalForSweep = globalThis as unknown as { __journalSessionSweep?: boolean };
+if (!globalForSweep.__journalSessionSweep && process.env.VITEST !== "true") {
+  globalForSweep.__journalSessionSweep = true;
+  queueMicrotask(() => {
+    try {
+      if (authDbExists()) sweepExpiredSessions();
+    } catch {
+      /* auth.db not writable yet; handler() reports it on first request */
+    }
+  });
+}

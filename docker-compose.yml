@@ -6,9 +6,10 @@ services:
     volumes:
       - ./data:/data
     environment:
-      # Optional: require a password (recommended when exposed beyond localhost)
-      JOURNAL_PASSWORD: ${JOURNAL_PASSWORD}
-      # Optional: stable encryption secret for broker credentials at rest
+      # Encryption secret for broker and AI credentials inside each journal
       JOURNAL_SECRET: ${JOURNAL_SECRET}
+      # Read the client IP from X-Forwarded-For (keep true behind a reverse proxy;
+      # never expose the container port directly when true)
+      JOURNAL_TRUST_PROXY: ${JOURNAL_TRUST_PROXY:-true}
       JOURNAL_DATA_DIR: /data
     restart: unless-stopped
