@@ -1,44 +1,68 @@
-import Database from "better-sqlite3-multiple-ciphers";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import * as schema from "./schema";
-import { BOOTSTRAP_SQL } from "./bootstrap";
-import { dataDir } from "./paths";
+import { currentUserContext, type UserContext } from "@/server/auth/context";
+import { authDbExists, dataDir, legacyJournalPath, userDataDir } from "./paths";
+import { openJournal, type Journal } from "./journal";
+import type Database from "better-sqlite3-multiple-ciphers";
+
 export { dataDir } from "./paths";
+export * from "./schema";
 
-const globalForDb = globalThis as unknown as { __journalDb?: ReturnType<typeof createDb> };
+interface Open {
+  sqlite: Database.Database;
+  orm: Journal;
+  lastUsed: number;
+}
 
-const createDb = () => {
-  const dir = dataDir();
-  mkdirSync(dir, { recursive: true });
-  const sqlite = new Database(join(dir, "journal.db"));
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.exec(BOOTSTRAP_SQL);
-  // Additive upgrade: existing executions retain their fields and dedup hashes.
-  const executionColumns = sqlite.pragma("table_info(executions)") as { name: string }[];
-  if (!executionColumns.some((column) => column.name === "import_metadata_json")) {
-    sqlite.exec("ALTER TABLE executions ADD COLUMN import_metadata_json TEXT");
+const LEGACY = "__legacy__";
+const globalForDb = globalThis as unknown as { __journalOpen?: Map<string, Open> };
+const open = (globalForDb.__journalOpen ??= new Map<string, Open>());
+
+const acquire = (key: string, file: string, dek?: Buffer): Journal => {
+  let entry = open.get(key);
+  if (!entry) {
+    const opened = openJournal(file, dek);
+    entry = { ...opened, lastUsed: Date.now() };
+    open.set(key, entry);
   }
-  // Materialize CSV bounds once so connection and range lookups never scan candle JSON.
-  const csvColumns = sqlite.pragma("table_info(market_csv_datasets)") as { name: string }[];
-  sqlite.transaction(() => {
-    for (const name of ["bar_count", "first_time", "last_time"]) {
-      if (!csvColumns.some((column) => column.name === name))
-        sqlite.exec(
-          `ALTER TABLE market_csv_datasets ADD COLUMN ${name} INTEGER NOT NULL DEFAULT 0`,
-        );
-    }
-    sqlite.exec(`UPDATE market_csv_datasets SET
-      bar_count = json_array_length(bars_json),
-      first_time = json_extract(bars_json, '$[0].time'),
-      last_time = json_extract(bars_json, '$[#-1].time') WHERE bar_count = 0`);
-  })();
-  return drizzle(sqlite, { schema });
+  entry.lastUsed = Date.now();
+  return entry.orm;
 };
 
-/** Singleton across Next dev hot reloads. */
-export const db = globalForDb.__journalDb ?? (globalForDb.__journalDb = createDb());
+/** The calling user's journal. Opens and caches the encrypted connection. */
+export const journalFor = (ctx: UserContext): Journal =>
+  acquire(ctx.userId, join(userDataDir(ctx.userId), "journal.db"), ctx.dek);
 
-export * from "./schema";
+const resolve = (): Journal => {
+  const ctx = currentUserContext();
+  if (ctx) return journalFor(ctx);
+  if (!authDbExists()) return acquire(LEGACY, legacyJournalPath());
+  throw new Error("No user context: db used outside handler()");
+};
+
+const close = (key: string): void => {
+  const entry = open.get(key);
+  if (!entry) return;
+  entry.sqlite.close();
+  open.delete(key);
+};
+
+export const closeJournal = (userId: string): void => close(userId);
+export const closeLegacyJournal = (): void => close(LEGACY);
+export const closeIdleJournals = (maxIdleMs = 15 * 60 * 1000): void => {
+  const cutoff = Date.now() - maxIdleMs;
+  for (const [key, entry] of open) if (entry.lastUsed < cutoff) close(key);
+};
+
+/**
+ * Request-scoped database. Every property access resolves the current user's
+ * connection, so the modules importing `db` need no changes.
+ */
+export const db: Journal = new Proxy({} as Journal, {
+  get(_target, property) {
+    const target = resolve();
+    const value = Reflect.get(target, property, target) as unknown;
+    return typeof value === "function"
+      ? (value as (...a: unknown[]) => unknown).bind(target)
+      : value;
+  },
+});
