@@ -71,6 +71,14 @@ describe("user management", () => {
     expect(recovered?.recoveryKey).not.toBe(created.recoveryKey);
     expect(users.recoverWithKey("dave", created.recoveryKey, "dave-password-14")).toBeNull();
     expect(users.verifyLogin("dave", "dave-password-13")?.dek.equals(created.dek)).toBe(true);
+    // The old recovery key no longer works (checked above); the rotated key does.
+    const secondRecovery = users.recoverWithKey(
+      "dave",
+      recovered?.recoveryKey ?? "",
+      "dave-password-15",
+    );
+    expect(secondRecovery?.dek.equals(created.dek)).toBe(true);
+    expect(users.verifyLogin("dave", "dave-password-15")?.dek.equals(created.dek)).toBe(true);
   });
   it("lock, role and delete", () => {
     const created = users.createUser({

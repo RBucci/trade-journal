@@ -124,8 +124,15 @@ export const createUser = (input: {
   return { user: toRecord(row), recoveryKey: rk.recoveryKey, dek };
 };
 
-/** Same cost as a real verification, used when the username does not exist. */
+/**
+ * Same cost as a real verification, used when the username does not exist.
+ * verifyLogin performs two scrypt derivations for an existing user (the
+ * password-hash check, then the DEK unwrap), so this also derives twice —
+ * otherwise an unknown username would respond measurably faster than a
+ * known one with a wrong password, leaking whether the account exists.
+ */
 export const dummyPasswordWork = (): void => {
+  deriveKey("dummy-password-work", "00000000000000000000000000000000");
   deriveKey("dummy-password-work", "00000000000000000000000000000000");
 };
 
@@ -185,11 +192,16 @@ export const recoverWithKey = (
     deriveKey(normalizeRecoveryKey(recoveryKey), row.salt_r),
   );
   if (!dek) return null;
-  storePassword(row.id, dek, newPassword);
   const rk = wrapForRecovery(dek);
-  authDb()
-    .prepare("UPDATE users SET salt_r = ?, dek_wrapped_recovery = ?, updated_at = ? WHERE id = ?")
-    .run(rk.salt_r, rk.dek_wrapped_recovery, nowIso(), row.id);
+  // Re-wrap under the new password and rotate the recovery key atomically: an
+  // interruption between the two writes must not leave the old recovery key
+  // still valid alongside a new password.
+  authDb().transaction(() => {
+    storePassword(row.id, dek, newPassword);
+    authDb()
+      .prepare("UPDATE users SET salt_r = ?, dek_wrapped_recovery = ?, updated_at = ? WHERE id = ?")
+      .run(rk.salt_r, rk.dek_wrapped_recovery, nowIso(), row.id);
+  })();
   const fresh = rowById(row.id);
   if (!fresh) return null;
   return { user: toRecord(fresh), dek, recoveryKey: rk.recoveryKey };
