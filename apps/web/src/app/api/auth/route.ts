@@ -73,6 +73,9 @@ export const POST = handler(
 
 export const DELETE = handler(
   async () => {
+    // Before setup there is no session to delete, and reaching auth.db here
+    // would create it — which would end setup mode with no account in it.
+    if (setupRequired()) return ok({ authenticated: false });
     const jar = await cookies();
     const raw = jar.get(AUTH_COOKIE)?.value;
     if (raw) deleteSession(raw);

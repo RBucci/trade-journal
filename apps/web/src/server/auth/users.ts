@@ -95,6 +95,10 @@ export const createUser = (input: {
 }): { user: UserRecord; recoveryKey: string; dek: Buffer } => {
   validateUsername(input.username);
   validatePassword(input.password);
+  // The only caller allowed to create auth.db: setup runs through here, and an
+  // empty auth.db created by anything else would silently end setup mode with
+  // no account in it. runSetup deletes the file again if anything below fails.
+  const db = authDb({ create: true });
   if (rowByUsername(input.username))
     throw new RequestError("A user with that name already exists.");
   const dek = generateDek();
@@ -102,23 +106,21 @@ export const createUser = (input: {
   const rk = wrapForRecovery(dek);
   const id = randomBytes(16).toString("hex");
   const now = nowIso();
-  authDb()
-    .prepare(
-      `INSERT INTO users (id, username, role, password_hash, salt_v, salt_p, dek_wrapped_password,
+  db.prepare(
+    `INSERT INTO users (id, username, role, password_hash, salt_v, salt_p, dek_wrapped_password,
         salt_r, dek_wrapped_recovery, must_change_password, locked_until, created_at, updated_at)
        VALUES (@id, @username, @role, @password_hash, @salt_v, @salt_p, @dek_wrapped_password,
         @salt_r, @dek_wrapped_recovery, @must_change_password, NULL, @now, @now)`,
-    )
-    .run({
-      id,
-      username: input.username,
-      role: input.role,
-      ...pw,
-      salt_r: rk.salt_r,
-      dek_wrapped_recovery: rk.dek_wrapped_recovery,
-      must_change_password: input.mustChangePassword ? 1 : 0,
-      now,
-    });
+  ).run({
+    id,
+    username: input.username,
+    role: input.role,
+    ...pw,
+    salt_r: rk.salt_r,
+    dek_wrapped_recovery: rk.dek_wrapped_recovery,
+    must_change_password: input.mustChangePassword ? 1 : 0,
+    now,
+  });
   const row = rowById(id);
   if (!row) throw new Error("User insert failed");
   return { user: toRecord(row), recoveryKey: rk.recoveryKey, dek };

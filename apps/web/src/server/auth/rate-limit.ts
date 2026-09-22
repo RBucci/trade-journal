@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { authDbExists } from "@/db/paths";
 import { authDb } from "./db";
 import { findUserByUsername, setUserLock } from "./users";
 
@@ -66,8 +67,9 @@ export const clientIp = (request: Request): string => {
 
 // ---------- blocks ----------
 
-export const listBlocks = (now = Date.now()) =>
-  (
+export const listBlocks = (now = Date.now()) => {
+  if (!authDbExists()) return [];
+  return (
     authDb()
       .prepare(
         "SELECT cidr, source, reason, created_at, expires_at FROM ip_blocks WHERE expires_at IS NULL OR expires_at > ? ORDER BY created_at DESC",
@@ -86,6 +88,7 @@ export const listBlocks = (now = Date.now()) =>
     createdAt: r.created_at,
     expiresAt: r.expires_at,
   }));
+};
 
 export const addBlock = (input: {
   cidr: string;
@@ -113,7 +116,7 @@ export const removeBlock = (cidr: string): void => {
 };
 
 export const isIpBlocked = (ip: string, now = Date.now()): boolean => {
-  if (ip === "unknown") return false;
+  if (ip === "unknown" || !authDbExists()) return false;
   return listBlocks(now).some((block) => ipInCidr(ip, block.cidr));
 };
 
@@ -149,6 +152,7 @@ export const checkLogin = (
   username: string,
   now = Date.now(),
 ): { allowed: true } | { allowed: false; retryAfterSec: number; message: string } => {
+  if (!authDbExists()) return { allowed: true };
   const ipUntil = blockExpiry(ip, now);
   if (ipUntil !== null) {
     if (ipUntil === Number.POSITIVE_INFINITY) {
@@ -182,6 +186,7 @@ export const recordAttempt = (
   success: boolean,
   now = Date.now(),
 ): void => {
+  if (!authDbExists()) return;
   authDb()
     .prepare("INSERT INTO login_attempts (username, ip, at, success) VALUES (?, ?, ?, ?)")
     .run(username, ip, iso(now), success ? 1 : 0);

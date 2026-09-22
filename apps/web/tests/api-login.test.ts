@@ -52,6 +52,13 @@ describe("setup and login routes", () => {
     );
     expect(loginRes.status).toBe(409);
     expect(existsSync(authDbPath())).toBe(false);
+    // An anonymous sign-out with any cookie value must not create auth.db:
+    // that would make setupRequired() false forever, with no account in it.
+    jar.token = "x";
+    const logoutRes = await auth.DELETE(get("/api/auth"));
+    expect(logoutRes.status).toBe(200);
+    expect(existsSync(authDbPath())).toBe(false);
+    jar.token = undefined;
   });
   it("reports setup mode, then completes setup once", async () => {
     expect(await (await auth.GET(get("/api/auth"))).json()).toMatchObject({

@@ -1,5 +1,5 @@
 import Database from "better-sqlite3-multiple-ciphers";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dataDir, authDbPath } from "@/db/paths";
 
 export type Role = "admin" | "user";
@@ -53,12 +53,21 @@ const globalForAuth = globalThis as unknown as {
   __journalAuthDbPath?: string;
 };
 
-/** Creates data/auth.db on first call. Only setup and user creation may be the first caller. */
-export const authDb = (): Database.Database => {
+/**
+ * Opens data/auth.db. Creating the file is opt-in and reserved for createUser,
+ * which is the only path setup takes: setupRequired() is just "auth.db is
+ * absent", so any other caller that created the file would end setup mode with
+ * no account in it and leave the install unreachable. Every other caller must
+ * therefore be safe before setup (see authDbExists in @/db/paths) and gets an
+ * error here rather than an empty database.
+ */
+export const authDb = (options?: { create?: boolean }): Database.Database => {
   const path = authDbPath();
   if (globalForAuth.__journalAuthDb && globalForAuth.__journalAuthDbPath === path) {
     return globalForAuth.__journalAuthDb;
   }
+  if (options?.create !== true && !existsSync(path))
+    throw new Error("auth.db does not exist; setup has not run");
   mkdirSync(dataDir(), { recursive: true });
   const sqlite = new Database(path);
   sqlite.pragma("journal_mode = WAL");

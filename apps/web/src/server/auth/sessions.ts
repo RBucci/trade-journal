@@ -55,6 +55,7 @@ export const createSession = (input: {
 
 export const resolveSession = (rawToken: string | undefined, now = Date.now()): Resolved => {
   if (!rawToken || !/^[0-9a-f]{64}$/.test(rawToken)) return { kind: "none" };
+  if (!authDbExists()) return { kind: "none" };
   const tokenHash = hashToken(rawToken);
   const row = authDb()
     .prepare("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?")
@@ -78,6 +79,7 @@ export const resolveSession = (rawToken: string | undefined, now = Date.now()): 
 };
 
 export const touchSession = (tokenHash: string, now = Date.now()): void => {
+  if (!authDbExists()) return;
   const entry = memory.get(tokenHash);
   if (!entry || now - entry.touchedAt < TOUCH_INTERVAL_MS) return;
   entry.touchedAt = now;
@@ -87,18 +89,21 @@ export const touchSession = (tokenHash: string, now = Date.now()): void => {
 };
 
 export const deleteSession = (rawToken: string): void => {
+  if (!authDbExists()) return;
   const tokenHash = hashToken(rawToken);
   authDb().prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash);
   memory.delete(tokenHash);
 };
 
 export const deleteUserSessions = (userId: string): void => {
+  if (!authDbExists()) return;
   authDb().prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
   for (const [hash, entry] of memory) if (entry.userId === userId) memory.delete(hash);
 };
 
-export const listUserSessions = (userId: string) =>
-  (
+export const listUserSessions = (userId: string) => {
+  if (!authDbExists()) return [];
+  return (
     authDb()
       .prepare(
         "SELECT token_hash, created_at, last_seen_at, ip, user_agent FROM sessions WHERE user_id = ? ORDER BY last_seen_at DESC",
@@ -117,8 +122,10 @@ export const listUserSessions = (userId: string) =>
     ip: r.ip,
     userAgent: r.user_agent,
   }));
+};
 
 export const sweepExpiredSessions = (now = Date.now()): number => {
+  if (!authDbExists()) return 0;
   const cutoff = new Date(now).toISOString();
   const expired = authDb()
     .prepare("SELECT token_hash FROM sessions WHERE expires_at <= ?")
