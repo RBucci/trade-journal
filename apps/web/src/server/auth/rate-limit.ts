@@ -195,6 +195,19 @@ export const checkLogin = (
       message: `Too many attempts. Try again in ${minutesLeft(ipUntil, now)} minutes.`,
     };
   }
+  // Requests with no usable client address all share the name "unknown", which
+  // no CIDR can match, so the block list cannot hold them. Without a window of
+  // its own this is a bucket an attacker can simply choose: strip the proxy
+  // header, or reach the app port directly, and the IP limit disappears.
+  if (
+    ip === "unknown" &&
+    countAttempts("ip", "unknown", now - LIMITS.ip.windowMs, false) >= LIMITS.ip.attempts
+  )
+    return {
+      allowed: false,
+      retryAfterSec: LIMITS.ip.blockMs / 1000,
+      message: `Too many attempts. Try again in ${LIMITS.ip.blockMs / 60000} minutes.`,
+    };
   const user = findUserByUsername(username);
   if (user?.lockedUntil && new Date(user.lockedUntil).getTime() > now) {
     const until = new Date(user.lockedUntil).getTime();
@@ -234,6 +247,8 @@ export const recordAttempt = (
   authDb()
     .prepare("INSERT INTO login_attempts (username, ip, at, success) VALUES (?, ?, ?, ?)")
     .run(username, ip, iso(now), success ? 1 : 0);
+  // "unknown" attempts are recorded above and answered by checkLogin's own
+  // window; they get no ip_blocks row, because no CIDR can ever match them.
   if (
     ip !== "unknown" &&
     countAttempts("ip", ip, now - LIMITS.ip.windowMs, false) >= LIMITS.ip.attempts

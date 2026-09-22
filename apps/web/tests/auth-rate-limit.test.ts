@@ -74,6 +74,21 @@ describe("rate limiting", () => {
     expect(rl.checkLogin("203.0.113.40", "alice", t + 7000).allowed).toBe(true);
     expect(getUser(alice.user.id)?.lockedUntil).toBe(null);
   });
+  it("bounds the unknown-address bucket with a window instead of a CIDR block", () => {
+    const t = T0 + min(240);
+    for (let i = 0; i < 10; i += 1) rl.recordAttempt("unknown", `ghost-${i}`, false, t + i * 1000);
+    const denied = rl.checkLogin("unknown", "ghost", t + 11000);
+    expect(denied.allowed).toBe(false);
+    if (!denied.allowed) {
+      expect(denied.retryAfterSec).toBe(3600);
+      expect(denied.message).toBe("Too many attempts. Try again in 60 minutes.");
+    }
+    // No block row is written: "unknown" is not an address and matches no CIDR.
+    expect(rl.listBlocks(t + 11000).map((b) => b.cidr)).not.toContain("unknown");
+    expect(rl.isIpBlocked("unknown", t + 11000)).toBe(false);
+    // Past the window (the rows are pruned well before this) it allows again.
+    expect(rl.checkLogin("unknown", "ghost", t + min(61)).allowed).toBe(true);
+  });
   it("manual CIDR blocks match and can be removed", () => {
     rl.addBlock({ cidr: "192.0.2.0/24", reason: "test" });
     expect(rl.isIpBlocked("192.0.2.77")).toBe(true);
