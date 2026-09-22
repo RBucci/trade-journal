@@ -35,23 +35,38 @@ const ipToBigInt = (ip: string): { value: bigint; bits: 128 } | null => {
   return { value, bits: 128 };
 };
 
+/** "::ffff:1.2.3.4" is an IPv4 address in IPv6 clothing; anything else is not. */
+const unmapV4 = (address: string): string | null => {
+  if (!address.startsWith("::ffff:")) return isIP(address) === 4 ? address : null;
+  const mapped = address.slice(7);
+  return isIP(mapped) === 4 ? mapped : null;
+};
+
 export const ipInCidr = (ip: string, cidr: string): boolean => {
-  const [base, prefixText] = cidr.split("/");
-  if (!base) return false;
-  const baseParsed = ipToBigInt(base);
+  const [rawBase, prefixText] = cidr.split("/");
+  if (!rawBase) return false;
+  // Count the prefix on the mapped form, so "::ffff:198.51.100.0/24" covers
+  // the 256 addresses it names rather than being read as 24 bits of IPv6.
+  const v4Base = unmapV4(rawBase);
+  const baseParsed = ipToBigInt(v4Base ?? rawBase);
   const ipParsed = ipToBigInt(ip);
   if (!baseParsed || !ipParsed) return false;
-  const baseIsV4 = isIP(base.startsWith("::ffff:") ? base.slice(7) : base) === 4;
-  const rawPrefix = prefixText === undefined ? (baseIsV4 ? 32 : 128) : Number(prefixText);
-  const prefix = baseIsV4 ? rawPrefix + 96 : rawPrefix;
+  const rawPrefix = prefixText === undefined ? (v4Base ? 32 : 128) : Number(prefixText);
+  // Rows stored before the mapped form was normalised carry a 128-bit prefix
+  // on a mapped base; those bits already count from the front of the address.
+  const wasMapped = v4Base !== null && rawBase.startsWith("::ffff:");
+  const prefix = v4Base && !(wasMapped && rawPrefix > 32) ? rawPrefix + 96 : rawPrefix;
   if (!Number.isInteger(prefix) || prefix < 0 || prefix > 128) return false;
   const shift = BigInt(128 - prefix);
   return baseParsed.value >> shift === ipParsed.value >> shift;
 };
 
 const normalizeCidr = (cidr: string): string => {
-  const [base, prefix] = cidr.trim().split("/");
-  if (!base || isIP(base) === 0) throw new Error("Invalid IP or CIDR");
+  const [raw, prefix] = cidr.trim().split("/");
+  if (!raw || isIP(raw) === 0) throw new Error("Invalid IP or CIDR");
+  // Store "::ffff:1.2.3.4" as "1.2.3.4/32": kept in its mapped form it would
+  // get a /128 default that ipInCidr can only read as an unreachable /224.
+  const base = unmapV4(raw) ?? raw;
   const bits = isIP(base) === 4 ? 32 : 128;
   const p = prefix === undefined ? bits : Number(prefix);
   if (!Number.isInteger(p) || p < 0 || p > bits) throw new Error("Invalid CIDR prefix");

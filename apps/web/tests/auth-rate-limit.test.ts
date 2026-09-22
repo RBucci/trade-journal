@@ -99,6 +99,18 @@ describe("rate limiting", () => {
     expect(rl.isIpBlocked("192.0.2.77")).toBe(false);
     expect(rl.ipInCidr("::ffff:192.0.2.1", "192.0.2.0/24")).toBe(true);
   });
+  it("matches IPv4-mapped IPv6 blocks in either notation", () => {
+    rl.addBlock({ cidr: "::ffff:198.51.100.9" });
+    expect(rl.listBlocks().map((b) => b.cidr)).toContain("198.51.100.9/32");
+    expect(rl.isIpBlocked("198.51.100.9")).toBe(true);
+    expect(rl.isIpBlocked("::ffff:198.51.100.9")).toBe(true);
+    expect(rl.ipInCidr("198.51.100.9", "::ffff:198.51.100.0/24")).toBe(true);
+    expect(rl.ipInCidr("198.51.100.9", "::ffff:198.51.101.0/24")).toBe(false);
+    // A row written before the mapped form was normalised still matches.
+    expect(rl.ipInCidr("198.51.100.9", "::ffff:198.51.100.9/128")).toBe(true);
+    rl.removeBlock("::ffff:198.51.100.9");
+    expect(rl.isIpBlocked("198.51.100.9")).toBe(false);
+  });
   it("reports a permanent manual block with a fixed message, not a fake retry time", () => {
     rl.addBlock({ cidr: "198.18.0.5" });
     const denied = rl.checkLogin("198.18.0.5", "ghost");
