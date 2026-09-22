@@ -65,13 +65,14 @@ docker compose up -d
 
 ### Configuration (all optional)
 
-| Env var               | Effect                                                                                                                              |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `JOURNAL_SECRET`      | Encryption key source for credentials at rest (default: generated key file in the data dir)                                         |
-| `JOURNAL_DATA_DIR`    | Database, attachments, and local encryption key directory (default `./data` relative to the app process)                            |
-| `JOURNAL_TRUST_PROXY` | Trust `X-Forwarded-For` for rate limiting and session records (default `true`). Keep the app port reachable only through the proxy. |
-| `ANTHROPIC_API_KEY`   | Anthropic AI key via env instead of the Settings page                                                                               |
-| `OPENAI_API_KEY`      | OpenAI AI key via env instead of the Settings page                                                                                  |
+| Env var               | Effect                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `JOURNAL_SECRET`      | Encryption key source for credentials at rest (default: generated key file in the data dir)                                          |
+| `JOURNAL_DATA_DIR`    | Database, attachments, and local encryption key directory (default `./data` relative to the app process)                             |
+| `JOURNAL_TRUST_PROXY` | Trust `X-Forwarded-For` for rate limiting and session records (default `true`). Keep the app port reachable only through the proxy.  |
+| `JOURNAL_BIND`        | Host address Docker publishes the port on (default `0.0.0.0`). Set `127.0.0.1` when a reverse proxy on this host is the only client. |
+| `ANTHROPIC_API_KEY`   | Anthropic AI key via env instead of the Settings page                                                                                |
+| `OPENAI_API_KEY`      | OpenAI AI key via env instead of the Settings page                                                                                   |
 
 Set these in the process environment or in `apps/web/.env.local` for local Next.js runs; the root [`.env.example`](.env.example) documents the optional values. For Docker, configure the service environment in [`docker-compose.yml`](docker-compose.yml).
 

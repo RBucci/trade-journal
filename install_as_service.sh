@@ -24,6 +24,7 @@
 #   REPO_URL          git repository to clone     (default: https://github.com/RBucci/trade-journal.git)
 #   REPO_BRANCH       branch to check out         (default: main)
 #   JOURNAL_PORT      host port to listen on      (default: 3333)
+#   JOURNAL_BIND      host address to publish on  (default: 0.0.0.0; use 127.0.0.1 behind a local reverse proxy)
 #   JOURNAL_SECRET    encryption secret           (default: generated)
 #   JOURNAL_TRUST_PROXY  read client IP from X-Forwarded-For (default: true)
 #
@@ -33,6 +34,7 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/trade-journal}"
 REPO_URL="${REPO_URL:-https://github.com/RBucci/trade-journal.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 JOURNAL_PORT="${JOURNAL_PORT:-3333}"
+JOURNAL_BIND="${JOURNAL_BIND:-0.0.0.0}"
 SERVICE_NAME="trade-journal"
 CONTAINER_UID=1000   # the "node" user inside the image owns /data
 
@@ -104,6 +106,7 @@ else
 # Trade Journal secrets. Keep this file: losing JOURNAL_SECRET makes saved broker and AI keys unreadable.
 # After editing, run: sudo systemctl restart ${SERVICE_NAME}
 JOURNAL_PORT=${JOURNAL_PORT}
+JOURNAL_BIND=${JOURNAL_BIND}
 JOURNAL_SECRET=${JOURNAL_SECRET}
 JOURNAL_TRUST_PROXY=true
 EOF

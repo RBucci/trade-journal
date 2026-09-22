@@ -2,7 +2,8 @@ services:
   journal:
     build: .
     ports:
-      - "${JOURNAL_PORT:-3333}:3000"
+      # Bind to 127.0.0.1 when the reverse proxy runs on this host's network; the app trusts X-Forwarded-For, so the port must not be reachable directly by clients.
+      - "${JOURNAL_BIND:-0.0.0.0}:${JOURNAL_PORT:-3333}:3000"
     volumes:
       - ./data:/data
     environment:
