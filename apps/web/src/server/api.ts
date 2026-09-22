@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { AUTH_COOKIE, passwordConfigured, verifySession } from "./auth";
-
-export class RequestError extends Error {}
-export function requireValue(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new RequestError(message);
-}
+import { RequestError } from "./errors";
+export { RequestError, requireValue } from "./errors";
 
 export const ok = (data: unknown, init?: ResponseInit) => {
   const headers = new Headers(init?.headers);
