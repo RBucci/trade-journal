@@ -126,16 +126,19 @@ export const createUser = (input: {
   return { user: toRecord(row), recoveryKey: rk.recoveryKey, dek };
 };
 
+const DUMMY_SALT = "00000000000000000000000000000000";
+
 /**
  * Same cost as a real verification, used when the username does not exist.
- * verifyLogin performs two scrypt derivations for an existing user (the
- * password-hash check, then the DEK unwrap), so this also derives twice —
- * otherwise an unknown username would respond measurably faster than a
- * known one with a wrong password, leaking whether the account exists.
+ * Every verifyLogin path costs exactly two scrypt derivations — a successful
+ * login (password hash, then DEK unwrap), a known user with a wrong password
+ * (password hash, then one dummy derivation) and an unknown user (two dummy
+ * derivations) — so the response time never reveals whether the account
+ * exists or how far the attempt got.
  */
 export const dummyPasswordWork = (): void => {
-  deriveKey("dummy-password-work", "00000000000000000000000000000000");
-  deriveKey("dummy-password-work", "00000000000000000000000000000000");
+  deriveKey("dummy-password-work", DUMMY_SALT);
+  deriveKey("dummy-password-work", DUMMY_SALT);
 };
 
 export const verifyLogin = (
@@ -147,7 +150,12 @@ export const verifyLogin = (
     dummyPasswordWork();
     return null;
   }
-  if (!verifyPassword(password, row.salt_v, row.password_hash)) return null;
+  if (!verifyPassword(password, row.salt_v, row.password_hash)) {
+    // Second derivation: without it this path returns after one scrypt while
+    // the unknown-user path does two, which times out to "that name exists".
+    deriveKey("dummy-password-work", row.salt_p);
+    return null;
+  }
   const dek = unwrapDek(row.dek_wrapped_password, deriveKey(password, row.salt_p));
   if (!dek) return null;
   return { user: toRecord(row), dek };

@@ -1,6 +1,7 @@
 import { bad, handler, ok } from "@/server/api";
 import { closeJournal } from "@/db";
 import { currentUser } from "@/server/auth/context";
+import { clearUsernameFailures } from "@/server/auth/rate-limit";
 import { deleteUserSessions } from "@/server/auth/sessions";
 import { countAdmins, deleteUser, getUser, setUserLock, setUserRole } from "@/server/auth/users";
 
@@ -23,6 +24,9 @@ export const PATCH = handler(
     if (body.locked !== undefined) {
       setUserLock(id, body.locked ? "9999-12-31T00:00:00.000Z" : null);
       if (body.locked) deleteUserSessions(id);
+      // Re-enabling has to clear the failure counter as well, or checkLogin
+      // keeps refusing the account on its own stale attempt rows.
+      else clearUsernameFailures(target.username);
     }
     return ok({ user: getUser(id) });
   },

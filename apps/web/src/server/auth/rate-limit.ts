@@ -8,6 +8,9 @@ export const LIMITS = {
   user: { failures: 5, windowMs: 5 * 60 * 1000, blockMs: 360 * 60 * 1000 },
 } as const;
 
+/** A lock further out than this was set by an administrator, not by a counter. */
+const ADMIN_LOCK_THRESHOLD_MS = 365 * 24 * 60 * 60 * 1000;
+
 const iso = (ms: number): string => new Date(ms).toISOString();
 
 // ---------- IP parsing and CIDR matching ----------
@@ -144,6 +147,30 @@ const countAttempts = (
       .get(value, iso(since)) as { n: number }
   ).n;
 
+/** Failures logged for a username in the user window, whether or not it exists. */
+const usernameFailures = (username: string, now: number): { count: number; oldest: number } => {
+  const row = authDb()
+    .prepare(
+      `SELECT COUNT(*) AS n, MIN(at) AS oldest FROM login_attempts
+       WHERE username = ? COLLATE NOCASE AND success = 0 AND at > ?`,
+    )
+    .get(username, iso(now - LIMITS.user.windowMs)) as { n: number; oldest: string | null };
+  return { count: row.n, oldest: row.oldest ? Date.parse(row.oldest) : now };
+};
+
+/**
+ * Drops a username's failure rows after a successful sign-in, and when an
+ * administrator re-enables an account. Without it, four typos followed by the
+ * correct password would still lock the account on the next typo, and clearing
+ * a lock would leave the account barred by its own stale counter.
+ */
+export const clearUsernameFailures = (username: string): void => {
+  if (!authDbExists()) return;
+  authDb()
+    .prepare("DELETE FROM login_attempts WHERE username = ? COLLATE NOCASE AND success = 0")
+    .run(username);
+};
+
 const minutesLeft = (untilMs: number, now: number): number =>
   Math.max(1, Math.ceil((untilMs - now) / 60000));
 
@@ -171,11 +198,28 @@ export const checkLogin = (
   const user = findUserByUsername(username);
   if (user?.lockedUntil && new Date(user.lockedUntil).getTime() > now) {
     const until = new Date(user.lockedUntil).getTime();
+    // An administrator disabling an account writes a year-9999 lock. Reporting
+    // that as a retry time would promise a wait of millions of minutes.
+    if (until - now > ADMIN_LOCK_THRESHOLD_MS)
+      return { allowed: false, retryAfterSec: 3600, message: "This account has been disabled." };
     return {
       allowed: false,
       retryAfterSec: Math.ceil((until - now) / 1000),
       message: `Too many attempts. Try again in ${minutesLeft(until, now)} minutes.`,
     };
+  }
+  // The lock above can only exist for a real account, so answering on the
+  // attempt log too keeps an unknown username indistinguishable from a real
+  // one that has been locked.
+  const failures = usernameFailures(username, now);
+  if (failures.count >= LIMITS.user.failures) {
+    const until = failures.oldest + LIMITS.user.blockMs;
+    if (until > now)
+      return {
+        allowed: false,
+        retryAfterSec: Math.ceil((until - now) / 1000),
+        message: `Too many attempts. Try again in ${minutesLeft(until, now)} minutes.`,
+      };
   }
   return { allowed: true };
 };
@@ -204,6 +248,8 @@ export const recordAttempt = (
       `[auth] IP ${ip} blocked for ${LIMITS.ip.blockMs / 60000} minutes after ${LIMITS.ip.attempts} attempts (username ${username})`,
     );
   }
+  // A correct password proves the earlier failures were typos, not an attack.
+  if (success) clearUsernameFailures(username);
   if (
     !success &&
     countAttempts("username", username, now - LIMITS.user.windowMs, true) >= LIMITS.user.failures

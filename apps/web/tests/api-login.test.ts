@@ -108,9 +108,13 @@ describe("setup and login routes", () => {
     expect((await last?.json()).error).toMatch(/Try again in 360 minutes/);
   });
   it("recovers with the recovery key and rotates it", async () => {
+    // Re-enable the account the way Settings > Users does: clear the lock and
+    // the failure counter, or the previous test's failures still bar it.
     const { setUserLock, findUserByUsername } = await import("../src/server/auth/users");
+    const { clearUsernameFailures } = await import("../src/server/auth/rate-limit");
     const admin = findUserByUsername("admin");
     if (admin) setUserLock(admin.id, null);
+    clearUsernameFailures("admin");
     const res = await recover.POST(
       post(
         "/api/auth/recover",
