@@ -31,24 +31,19 @@ export interface HandlerOptions {
   allowPasswordChange?: boolean;
 }
 
-/**
- * Route-handler wrapper: auth gate, per-user journal context, uniform error JSON.
- *
- * `fn`'s own parameter types are checked normally where it's defined; the args
- * are forwarded untyped here so a callback that ignores its request/context
- * arguments (as several read-only GET routes and this module's own tests do)
- * doesn't force every caller of the wrapped route to match its exact arity.
- */
+/** Route-handler wrapper: auth gate, per-user journal context, uniform error JSON. */
 export const handler =
-  (fn: (...args: any[]) => Promise<Response> | Response, options: HandlerOptions = {}) =>
-  async (...args: unknown[]): Promise<Response> => {
+  <C extends unknown[]>(
+    fn: (request: Request, ...rest: C) => Promise<Response> | Response,
+    options: HandlerOptions = {},
+  ) =>
+  async (request: Request, ...rest: C): Promise<Response> => {
     try {
-      const request = args[0] instanceof Request ? args[0] : undefined;
       const setupDone = authDbExists();
-      if (request && setupDone && isIpBlocked(clientIp(request))) return forbidden("ip_blocked");
-      if (options.public) return await fn(...args);
+      if (setupDone && isIpBlocked(clientIp(request))) return forbidden("ip_blocked");
+      if (options.public) return await fn(request, ...rest);
       if (!setupDone) {
-        if (process.env.VITEST === "true") return await fn(...args);
+        if (process.env.VITEST === "true") return await fn(request, ...rest);
         return NextResponse.json(
           { error: "Setup required", reason: "setup_required" },
           { status: 409 },
@@ -68,7 +63,7 @@ export const handler =
       if (options.admin && user.role !== "admin") return forbidden("admin_only");
       touchSession(session.tokenHash);
       return await runWithUser({ userId: user.id, role: user.role, dek: session.dek }, () =>
-        fn(...args),
+        fn(request, ...rest),
       );
     } catch (error) {
       if (error instanceof JournalOpenError) {

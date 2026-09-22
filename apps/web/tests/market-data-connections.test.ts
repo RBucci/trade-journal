@@ -165,7 +165,9 @@ describe("trade history endpoint", () => {
     expect(
       (await (await csvRequest(request({ ...payload, action: "preview" }))).json()).count,
     ).toBe(3);
-    expect((await (await listCsv()).json()).datasets).toHaveLength(0);
+    expect(
+      (await (await listCsv(new Request("http://localhost/api/market-data/csv"))).json()).datasets,
+    ).toHaveLength(0);
     const imported = await (await csvRequest(request({ ...payload, action: "import" }))).json();
     expect(imported.datasets).toMatchObject([{ symbol: "TEST", count: 3 }]);
     expect(connections().find((item) => item.id === "market-csv")?.configured).toBe(true);
@@ -360,7 +362,7 @@ describe("market data credential lifecycle", () => {
     expect(state.map((item) => item.name)).toEqual(
       state.map((item) => item.name).sort((a, b) => a.localeCompare(b)),
     );
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/market-data/connections"));
     expect(response.status).toBe(200);
     for (const id of ["london-strategic-edge", "alpaca", "binance", "coinbase", "oanda"])
       expect(() => connectionKey(id)).toThrow();
@@ -375,7 +377,9 @@ describe("market data credential lifecycle", () => {
     expect(await response.text()).not.toContain("fixture-key-only");
     expect(JSON.stringify(db.select().from(settings).all())).not.toContain("fixture-key-only");
     expect(connectionKey(id)).toBe("fixture-key-only");
-    expect(await (await GET()).json()).toEqual({
+    expect(
+      await (await GET(new Request("http://localhost/api/market-data/connections"))).json(),
+    ).toEqual({
       connections: expect.arrayContaining([
         { id, name: "London Strategic Edge", configured: true, source: "saved" },
       ]),

@@ -21,7 +21,8 @@ const request = (body: unknown) =>
     body: JSON.stringify(body),
   });
 const save = (body: unknown) => PATCH(request(body));
-const state = async () => (await GET()).json();
+const getRequest = () => new Request("http://localhost/api/settings");
+const state = async () => (await GET(getRequest())).json();
 
 beforeEach(() => {
   db.delete(settings).run();
@@ -90,7 +91,11 @@ describe("AI provider settings", () => {
     const rows = JSON.stringify(db.select().from(settings).all());
     expect(rows).not.toContain("fixture-private");
     const exported = await exportData(new Request("http://localhost/api/export"));
-    for (const body of [await response.text(), await (await GET()).text(), await exported.text()]) {
+    for (const body of [
+      await response.text(),
+      await (await GET(getRequest())).text(),
+      await exported.text(),
+    ]) {
       expect(body).not.toContain("fixture-private");
       expect(body).not.toContain(getSetting("openaiKeyEnc")!);
       expect(body).not.toContain(getSetting("anthropicKeyEnc")!);

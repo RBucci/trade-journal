@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { AUTH_COOKIE } from "@/server/auth";
 
 const PUBLIC_PAGES = new Set(["/login", "/setup", "/recover"]);
 const PUBLIC_API = new Set(["/api/auth", "/api/auth/recover", "/api/setup"]);
@@ -11,7 +12,7 @@ const PUBLIC_API = new Set(["/api/auth", "/api/auth/recover", "/api/setup"]);
 export const middleware = (request: NextRequest) => {
   const { pathname } = request.nextUrl;
   if (PUBLIC_PAGES.has(pathname) || PUBLIC_API.has(pathname)) return NextResponse.next();
-  const cookie = request.cookies.get("journal_session")?.value;
+  const cookie = request.cookies.get(AUTH_COOKIE)?.value;
   if (!cookie) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
