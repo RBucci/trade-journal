@@ -2,6 +2,7 @@
 
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { acquireJson } from "./api-request";
+import { applyAuthRedirect } from "./auth-redirect";
 
 export interface ApiState<T> {
   data: T | null;
@@ -76,7 +77,10 @@ export const postJson = async <T = unknown>(
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(data.error ?? `Request failed (${response.status})`);
+  const data = (await response.json()) as T & { error?: string; reason?: string };
+  if (!response.ok) {
+    applyAuthRedirect(response.status, data);
+    throw new Error(data.error ?? `Request failed (${response.status})`);
+  }
   return data;
 };

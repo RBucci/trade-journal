@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { postJson, useApi } from "@/lib/use-api";
 import { LuxAlgoMark } from "@/components/luxalgo-mark";
 import { PrivacyToggle } from "./privacy";
 import { ThemeToggle } from "./theme";
@@ -128,6 +129,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
   }, []);
+  const { data: me } = useApi<{
+    authenticated: boolean;
+    user?: { username: string; role: "admin" | "user" };
+  }>("/api/auth");
   function toggleSidebar() {
     setSidebarCollapsed((collapsed) => {
       const next = !collapsed;
@@ -145,7 +150,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (value) filterQuery.set(key, value);
   }
   if (search.get("range")) filterQuery.set("range", search.get("range")!);
-  if (pathname === "/login") return <>{children}</>;
+  if (["/login", "/setup", "/recover", "/change-password"].includes(pathname))
+    return <>{children}</>;
   const navigation = (collapsed = false) => (
     <nav
       aria-label="Journal navigation"
@@ -177,7 +183,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ))}
     </nav>
   );
-  const footer = null;
+  const footer = me?.user ? (
+    <div className="journal-sidebar-footer flex items-center justify-between gap-2 border-t p-3 text-xs text-muted-foreground">
+      <span className="truncate" title={me.user.username}>
+        {sidebarCollapsed ? me.user.username.slice(0, 2).toUpperCase() : me.user.username}
+      </span>
+      <button
+        type="button"
+        className="underline underline-offset-2 hover:text-foreground"
+        onClick={async () => {
+          await postJson("/api/auth", undefined, "DELETE");
+          window.location.assign("/login");
+        }}
+      >
+        {sidebarCollapsed ? "Out" : "Sign out"}
+      </button>
+    </div>
+  ) : null;
   return (
     <div className="journal-shell min-h-dvh lg:flex">
       <header className="journal-mobile-header sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur lg:hidden">

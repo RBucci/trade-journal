@@ -203,7 +203,7 @@ describe("statement and display timezones are independent", () => {
 
   it("returns and backs up both timezone settings", async () => {
     await save({ timeZone: "America/Asuncion", importTimeZone: "Europe/Helsinki" });
-    expect(await (await getSettings()).json()).toMatchObject({
+    expect(await (await getSettings(request("settings"))).json()).toMatchObject({
       timeZone: "America/Asuncion",
       importTimeZone: "Europe/Helsinki",
     });

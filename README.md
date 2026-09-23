@@ -39,7 +39,7 @@ pnpm dev
 # http://localhost:3000
 ```
 
-Requirements: **Node 22+** and **pnpm 11.0.8** (the version pinned in `package.json`). First run creates the SQLite database and applies additive schema upgrades automatically. No migration tool, no setup wizard, no account. With the commands above, local data lives in `apps/web/data/`.
+Requirements: **Node 22+** and **pnpm 11.0.8** (the version pinned in `package.json`). First run creates the SQLite database and applies additive schema upgrades automatically. No migration tool. The first visit opens a one-step setup page that creates the administrator account. With the commands above, local data lives in `apps/web/data/`.
 
 For smooth everyday use or UI reviews, stop the development server and run `pnpm preview`.
 This builds the app once, then serves the optimized production version at the same address,
@@ -65,15 +65,18 @@ docker compose up -d
 
 ### Configuration (all optional)
 
-| Env var             | Effect                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------- |
-| `JOURNAL_PASSWORD`  | Require a password; recommended when accessible beyond localhost                                         |
-| `JOURNAL_SECRET`    | Encryption key source for credentials at rest (default: generated key file in the data dir)              |
-| `JOURNAL_DATA_DIR`  | Database, attachments, and local encryption key directory (default `./data` relative to the app process) |
-| `ANTHROPIC_API_KEY` | Anthropic AI key via env instead of the Settings page                                                    |
-| `OPENAI_API_KEY`    | OpenAI AI key via env instead of the Settings page                                                       |
+| Env var               | Effect                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `JOURNAL_SECRET`      | Encryption key source for credentials at rest (default: generated key file in the data dir)                                          |
+| `JOURNAL_DATA_DIR`    | Database, attachments, and local encryption key directory (default `./data` relative to the app process)                             |
+| `JOURNAL_TRUST_PROXY` | Trust `X-Forwarded-For` for rate limiting and session records (default `true`). Keep the app port reachable only through the proxy.  |
+| `JOURNAL_BIND`        | Host address Docker publishes the port on (default `0.0.0.0`). Set `127.0.0.1` when a reverse proxy on this host is the only client. |
+| `ANTHROPIC_API_KEY`   | Anthropic AI key via env instead of the Settings page                                                                                |
+| `OPENAI_API_KEY`      | OpenAI AI key via env instead of the Settings page                                                                                   |
 
 Set these in the process environment or in `apps/web/.env.local` for local Next.js runs; the root [`.env.example`](.env.example) documents the optional values. For Docker, configure the service environment in [`docker-compose.yml`](docker-compose.yml).
+
+Accounts are created on first run at `/setup`; further users are added by the administrator in **Settings → Users**. Each user's journal is a separate SQLCipher-encrypted database that only their password or recovery key can open.
 
 For AI, open **Settings → AI**, select **Anthropic** or **OpenAI**, enter your API key, and choose **Save AI settings**. OpenAI defaults to `gpt-4.1-mini`; you can enter another text model ID available to your account. Each provider keeps its own encrypted key and model choice. Existing Anthropic settings continue to work. An OpenAI-only environment setup selects OpenAI automatically; with both keys present, Anthropic remains the default until you save a provider choice. Environment keys override saved keys and must be changed on the server. Saving settings does not make a model request or verify account access.
 

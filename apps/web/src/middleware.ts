@@ -1,16 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { AUTH_COOKIE } from "@/server/auth";
+
+const PUBLIC_PAGES = new Set(["/login", "/setup", "/recover"]);
+const PUBLIC_API = new Set(["/api/auth", "/api/auth/recover", "/api/setup"]);
 
 /**
- * Auth guard (only active when JOURNAL_PASSWORD is set). The session cookie is
- * validated for presence here and cryptographically in API handlers — the
- * middleware runtime has no Node crypto, so it gates navigation while the
- * handlers gate data.
+ * Presence gate only: the edge runtime has no filesystem or Node crypto, so the
+ * cookie is validated in handler(). Pages without a cookie go to /login; the
+ * login page itself redirects to /setup when the server reports setup mode.
  */
 export const middleware = (request: NextRequest) => {
-  if (!process.env.JOURNAL_PASSWORD) return NextResponse.next();
   const { pathname } = request.nextUrl;
-  if (pathname === "/login" || pathname === "/api/auth") return NextResponse.next();
-  const cookie = request.cookies.get("journal_session")?.value;
+  if (PUBLIC_PAGES.has(pathname) || PUBLIC_API.has(pathname)) return NextResponse.next();
+  const cookie = request.cookies.get(AUTH_COOKIE)?.value;
   if (!cookie) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -10,7 +10,7 @@ You can expect an acknowledgment within a few business days. Please include repr
 
 ## Scope notes
 
-Trade Journal is self-hosted software: it stores broker credentials (encrypted at rest) and trading history on the machine that runs it. Reports about credential handling, the encryption layer (`apps/web/src/server/crypto.ts`), authentication (`JOURNAL_PASSWORD` sessions), and the statement importers (untrusted file parsing) are especially valuable.
+Trade Journal is self-hosted software: it stores broker credentials (encrypted at rest) and trading history on the machine that runs it. Accounts are created at `/setup`, and each user's journal is a separately encrypted SQLite database that only that user's password or recovery key can unlock; sign-in is rate limited with persistent IP and account lockouts. Reports about credential handling, the encryption layer (`apps/web/src/server/crypto.ts`), authentication and session handling, and the statement importers (untrusted file parsing) are especially valuable.
 
 ## Supported versions
 

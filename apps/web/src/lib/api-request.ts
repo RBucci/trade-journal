@@ -1,3 +1,5 @@
+import { applyAuthRedirect } from "./auth-redirect";
+
 interface PendingRequest {
   controller: AbortController;
   promise: Promise<unknown>;
@@ -15,7 +17,10 @@ export function acquireJson<T>(url: string): { promise: Promise<T>; release: () 
     next.promise = fetch(url, { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
         const body = await response.json();
-        if (!response.ok) throw new Error(body.error ?? `Request failed (${response.status})`);
+        if (!response.ok) {
+          applyAuthRedirect(response.status, body);
+          throw new Error(body.error ?? `Request failed (${response.status})`);
+        }
         return body;
       })
       .finally(() => {
